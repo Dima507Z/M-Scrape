@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M-Scrape</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-sky-top: #141c28;
+            --bg-sky-bottom: #1f2937;
+            --hill-far: #223042;
+            --hill-near: #2d3b4e;
+            --tree-trunk: #3e3229;
+            --tree-foliage: #d97706;
+            --leaf-color: rgba(245, 158, 11, 0.65);
+            
+            --glass-bg: rgba(22, 27, 34, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent: #f59e0b;
+            --accent-hover: #fbbf24;
+            --card-hover: rgba(255, 255, 255, 0.08);
+        }
+
+        [data-theme="light"] {
+            --bg-sky-top: #fef3c7;
+            --bg-sky-bottom: #fde68a;
+            --hill-far: #f6d88b;
+            --hill-near: #f59e0b;
+            --tree-trunk: #5d4037;
+            --tree-foliage: #ea580c;
+            --leaf-color: rgba(234, 88, 12, 0.6);
+            
+            --glass-bg: rgba(255, 255, 255, 0.78);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --glass-shadow: 0 12px 40px rgba(217, 119, 6, 0.15);
+            
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --accent: #ea580c;
+            --accent-hover: #c2410c;
+            --card-hover: rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-sky-bottom);
+            color: var(--text-main);
+            transition: background 0.6s ease;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .viewport {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+
+        /* Верхняя панель */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .top-left-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Музыкальный виджет */
+        .music-widget {
+            position: relative;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 14px 18px;
+            box-shadow: var(--glass-shadow);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            width: 180px;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .music-widget:hover { border-color: var(--accent); }
+
+        .music-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .music-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .music-title span {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent);
+        }
+
+        .music-body {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            margin-top: 0;
+        }
+
+        .music-widget.expanded {
+            width: 240px;
+            padding-bottom: 16px;
+        }
+
+        .music-widget.expanded .music-body {
+            max-height: 200px;
+            opacity: 1;
+            margin-top: 14px;
+        }
+
+        .preset-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .preset-btn {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover, .preset-btn.active {
+            background: var(--card-hover);
+            color: var(--text-main);
+            border-color: var(--accent);
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .play-ambient {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+
+        .play-ambient:hover { transform: scale(1.02); }
+
+        /* Переключатель темы */
+        .theme-switch {
+            display: flex;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 4px;
+            cursor: pointer;
+            position: relative;
+            width: 76px;
+            height: 48px;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--glass-shadow);
+            transition: border-color 0.3s;
+        }
+        .theme-switch:hover { border-color: var(--accent); }
+
+        .theme-switch-thumb {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 38px;
+            height: 38px;
+            background: var(--accent);
+            border-radius: 14px;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="dark"] .theme-switch-thumb { transform: translateX(30px); }
+
+        .theme-icon { font-size: 14px; z-index: 2; width: 36px; text-align: center; pointer-events: none; }
+
+        /* Погода */
+        .weather-widget {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 12px 18px;
+            box-shadow: var(--glass-shadow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .weather-widget:hover { border-color: var(--accent); }
+        .weather-widget span { color: var(--text-muted); font-size: 11px; }
+
+        /* Часы по центру */
+        .center-hero {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .hero-time {
+            font-size: 76px;
+            font-weight: 300;
+            letter-spacing: -2px;
+            color: var(--text-main);
+            text-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .hero-greeting {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        /* Нижняя панель */
+        .bottom-container {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+            height: 64px;
+        }
+
+        .search-trigger-btn {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 64px;
+            height: 64px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--glass-shadow);
+            transition: transform 0.3s, border-color 0.3s;
+            z-index: 10;
+        }
+
+        .search-trigger-btn:hover { border-color: var(--accent); transform: scale(1.05); }
+        .search-trigger-btn svg { width: 22px; height: 22px; stroke: var(--text-main); }
+
+        .dock {
+            margin-left: 80px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 10px 16px;
+            box-shadow: var(--glass-shadow);
+            overflow-x: auto;
+            max-width: calc(100vw - 120px);
+        }
+
+        .dock-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: var(--card-hover);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-size: 16px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .dock-item:hover { transform: translateY(-4px); border-color: var(--accent); background: var(--glass-border); }
+        .dock-item span { font-size: 9px; position: absolute; bottom: -16px; color: var(--text-muted); white-space: nowrap; }
+
+        .add-site-btn { background: transparent; border: 1px dashed var(--glass-border); color: var(--text-muted); }
+        .add-site-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .offline-game-btn { background: var(--card-hover); border: 1px solid var(--glass-border); color: var(--accent); font-weight: bold; }
+        .cinema-btn { background: var(--card-hover); border: 1px solid var(--glass-border); color: var(--accent); font-weight: bold; }
+
+        /* Модальные окна */
+        .search-overlay, .game-overlay, .cinema-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .search-overlay.active, .game-overlay.active, .cinema-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .search-box-modal {
+            width: 100%;
+            max-width: 600px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 16px 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .search-box-modal input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); font-size: 18px; }
+        .search-close, .modal-close { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 6px 10px; border-radius: 8px; }
+        .search-close:hover, .modal-close:hover { background: var(--card-hover); color: var(--text-main); }
+
+        /* Кино модалка */
+        .cinema-container {
+            width: 90%;
+            max-width: 900px;
+            height: 80vh;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+        }
+        .cinema-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .cinema-header h3 { font-size: 20px; color: var(--text-main); }
+        .cinema-grid {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            padding-right: 8px;
+        }
+        .movie-card {
+            background: var(--card-hover);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+        .movie-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+        .movie-poster { width: 100%; height: 230px; object-fit: cover; background: #222; }
+        .movie-info { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+        .movie-title { font-size: 12px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .movie-rating { font-size: 11px; color: var(--accent); }
+
+        /* Тетрис модалка */
+        .game-container {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+        }
+        .game-container h3 { margin-bottom: 12px; font-size: 18px; color: var(--text-main); }
+        canvas#tetris { background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid var(--glass-border); display: block; margin: 0 auto 12px auto; }
+        .game-info { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+        .game-close { background: var(--accent); color: #fff; border: none; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="viewport">
+        <!-- Верхняя строка -->
+        <div class="top-bar">
+            <div class="top-left-group">
+                <!-- Музыкальный виджет -->
+                <div class="music-widget" id="musicWidget">
+                    <div class="music-header" onclick="toggleWidget()">
+                        <div class="music-title"><span></span>Осенний Эмбиент</div>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <div class="music-body">
+                        <div class="preset-list">
+                            <button class="preset-btn active" onclick="setPreset('rain', event)">🌧️ Осенний дождь</button>
+                            <button class="preset-btn" onclick="setPreset('forest', event)">🌲 Лесной ветерок</button>
+                            <button class="preset-btn" onclick="setPreset('fireplace', event)">🔥 Тёплый камин</button>
+                        </div>
+                        <div class="controls-row">
+                            <button class="play-ambient" id="playBtn" onclick="togglePlay()">Играть</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Переключатель темы -->
+                <div class="theme-switch" onclick="toggleTheme()" title="Переключить тему">
+                    <span class="theme-icon">☀️</span>
+                    <span class="theme-icon">🌙</span>
+                    <div class="theme-switch-thumb"></div>
+                </div>
+            </div>
+
+            <!-- Погода -->
+            <div class="weather-widget" id="weatherWidget" onclick="fetchWeather()">
+                <span>📍 Загрузка...</span>
+            </div>
+        </div>
+
+        <!-- Центральные часы и приветствие -->
+        <div class="center-hero">
+            <div class="hero-time" id="heroTime">00:00</div>
+            <div class="hero-greeting" id="heroGreeting">Хорошего дня!</div>
+        </div>
+
+        <!-- Нижняя панель -->
+        <div class="bottom-container">
+            <div class="search-trigger-btn" onclick="openSearch()" title="Поиск">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+
+            <div class="dock" id="dockContainer">
+                <a href="https://youtube.com" class="dock-item" target="_blank">📺<span>YouTube</span></a>
+                <a href="https://discord.com" class="dock-item" target="_blank">💬<span>Discord</span></a>
+                <a href="https://web.telegram.org" class="dock-item" target="_blank">✈️<span>Telegram</span></a>
+                <a href="https://twitch.tv" class="dock-item" target="_blank">🎮<span>Twitch</span></a>
+                <a href="https://spotify.com" class="dock-item" target="_blank">🎵<span>Spotify</span></a>
+                <button class="dock-item cinema-btn" onclick="openCinema()" title="Что посмотреть">🎬<span>Кино</span></button>
+                <button class="dock-item offline-game-btn" onclick="openGame()" title="Офлайн игра (Тетрис)">🕹️<span>Тетрис</span></button>
+                <button class="dock-item add-site-btn" onclick="addSite()" title="Добавить сайт">＋</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно поиска -->
+    <div class="search-overlay" id="searchOverlay" onclick="closeSearchOnBg(event)">
+        <div class="search-box-modal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="searchInput" placeholder="Введите запрос для поиска..." onkeydown="handleSearchKey(event)">
+            <button class="search-close" onclick="closeSearch()">✕</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно Кино -->
+    <div class="cinema-overlay" id="cinemaOverlay" onclick="closeCinemaOnBg(event)">
+        <div class="cinema-container">
+            <div class="cinema-header">
+                <h3>🎬 Популярные фильмы</h3>
+                <button class="modal-close" onclick="closeCinema()">✕ Закрыть</button>
+            </div>
+            <div class="cinema-grid" id="cinemaGrid">
+                <!-- Карточки фильмов загружаются через JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно Тетриса -->
+    <div class="game-overlay" id="gameOverlay" onclick="closeGameOnBg(event)">
+        <div class="game-container">
+            <h3>Офлайн Тетрис</h3>
+            <canvas id="tetris" width="200" height="400"></canvas>
+            <div class="game-info">Управление: Стрелки влево/вправо/вниз</div>
+            <button class="game-close" onclick="closeGame()">Закрыть игру</button>
+        </div>
+    </div>
+
+    <script>
+        // Часы и приветствие
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('heroTime').textContent = `${hours}:${minutes}`;
+
+            const h = now.getHours();
+            let greet = 'Хорошего дня!';
+            if (h >= 5 && h < 12) greet = 'Доброе утро';
+            else if (h >= 12 && h < 18) greet = 'Добрый день';
+            else if (h >= 18 && h < 23) greet = 'Добрый вечер';
+            else greet = 'Доброй ночи';
+            
+            document.getElementById('heroGreeting').textContent = greet;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Погода
+        async function fetchWeather() {
+            const wEl = document.getElementById('weatherWidget');
+            wEl.innerHTML = `📍 <span>Обновление...</span>`;
+            try {
+                const res = await fetch('https://wttr.in/?format=%t+%C');
+                if (!res.ok) throw new Error();
+                const text = (await res.text()).trim();
+                wEl.innerHTML = `🌤️ <strong>${text}</strong> <span>Погода</span>`;
+            } catch {
+                wEl.innerHTML = `🌤️ <strong>+14°C</strong> <span>Осень</span>`;
+            }
+        }
+        fetchWeather();
+
+        window.addEventListener('offline', () => { openGame(); });
+
+        // Анимация фона (холмы + падающие листья)
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const leaves = [];
+        for (let i = 0; i < 35; i++) {
+            leaves.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 6 + 4,
+                speedX: (Math.random() - 0.5) * 0.6,
+                speedY: Math.random() * 0.8 + 0.4,
+                rot: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 2,
+                opacity: Math.random() * 0.4 + 0.3
+            });
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            if (isDark) {
+                skyGrad.addColorStop(0, '#141c28');
+                skyGrad.addColorStop(1, '#1f2937');
+            } else {
+                skyGrad.addColorStop(0, '#fef3c7');
+                skyGrad.addColorStop(1, '#fde68a');
+            }
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Дальний холм
+            ctx.fillStyle = isDark ? '#223042' : '#f6d88b';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.7);
+            ctx.quadraticCurveTo(canvas.width * 0.4, canvas.height * 0.55, canvas.width, canvas.height * 0.65);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.fill();
+
+            // Ближний холм
+            ctx.fillStyle = isDark ? '#2d3b4e' : '#f59e0b';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.8);
+            ctx.quadraticCurveTo(canvas.width * 0.7, canvas.height * 0.7, canvas.width, canvas.height * 0.78);
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.fill();
+
+            // Дерево
+            const treeX = canvas.width * 0.75;
+            const treeY = canvas.height * 0.62;
+            ctx.fillStyle = isDark ? '#3e3229' : '#5d4037';
+            ctx.fillRect(treeX - 4, treeY - 40, 8, 40);
+            ctx.fillStyle = isDark ? '#d97706' : '#ea580c';
+            ctx.beginPath();
+            ctx.arc(treeX, treeY - 45, 22, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Листья
+            leaves.forEach(l => {
+                ctx.save();
+                ctx.translate(l.x, l.y);
+                ctx.rotate(l.rot * Math.PI / 180);
+                ctx.fillStyle = isDark ? `rgba(245, 158, 11, ${l.opacity})` : `rgba(234, 88, 12, ${l.opacity})`;
+                ctx.filter = 'blur(1px)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, l.size, l.size * 0.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                l.x += l.speedX;
+                l.y += l.speedY;
+                l.rot += l.rotSpeed;
+
+                if (l.y > canvas.height + 10) { l.y = -10; l.x = Math.random() * canvas.width; }
+                if (l.x > canvas.width + 10) l.x = -10;
+                if (l.x < -10) l.x = canvas.width + 10;
+            });
+
+            requestAnimationFrame(drawScene);
+        }
+        drawScene();
+
+        // Виджет музыки
+        function toggleWidget() { document.getElementById('musicWidget').classList.toggle('expanded'); }
+        let isPlaying = false;
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('playBtn').textContent = isPlaying ? 'Пауза' : 'Играть';
+        }
+        function setPreset(type, event) {
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // Тема
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+        }
+
+        // Поиск
+        function openSearch() { document.getElementById('searchOverlay').classList.add('active'); document.getElementById('searchInput').focus(); }
+        function closeSearch() { document.getElementById('searchOverlay').classList.remove('active'); }
+        function closeSearchOnBg(e) { if (e.target.id === 'searchOverlay') closeSearch(); }
+        function handleSearchKey(e) {
+            if (e.key === 'Enter') {
+                const q = e.target.value.trim();
+                if (q) { window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, '_blank'); closeSearch(); }
+            } else if (e.key === 'Escape') closeSearch();
+        }
+
+        // Кино-виджет (TMDB)
+        async function openCinema() {
+            document.getElementById('cinemaOverlay').classList.add('active');
+            const grid = document.getElementById('cinemaGrid');
+            if (grid.children.length > 0) return;
+
+            grid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;text-align:center;padding:40px;">Загрузка фильмов...</div>';
+            try {
+                const res = await fetch('https://api.themoviedb.org/3/movie/popular?api_key=2d363939634e9e03975549887714fc0a&language=ru-RU&page=1');
+                const data = await res.json();
+                grid.innerHTML = '';
+                data.results.forEach(m => {
+                    const card = document.createElement('div');
+                    card.className = 'movie-card';
+                    card.innerHTML = `
+                        <img class="movie-poster" src="https://image.tmdb.org/t/p/w500${m.poster_path}" alt="${m.title}">
+                        <div class="movie-info">
+                            <div class="movie-title">${m.title}</div>
+                            <div class="movie-rating">⭐ ${m.vote_average.toFixed(1)}</div>
+                        </div>
+                    `;
+                    card.onclick = () => {
+                        window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(m.title + ' трейлер')}`, '_blank');
+                    };
+                    grid.appendChild(card);
+                });
+            } catch {
+                grid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;text-align:center;padding:40px;">Не удалось загрузить фильмы</div>';
+            }
+        }
+        function closeCinema() { document.getElementById('cinemaOverlay').classList.remove('active'); }
+        function closeCinemaOnBg(e) { if (e.target.id === 'cinemaOverlay') closeCinema(); }
+
+        // Добавление сайта
+        function addSite() {
+            const url = prompt('Введите адрес сайта (например, https://github.com):');
+            if (url) {
+                let fUrl = url.trim();
+                if (!fUrl.startsWith('http')) fUrl = 'https://' + fUrl;
+                try {
+                    const domain = new URL(fUrl).hostname.replace('www.', '');
+                    const name = domain.split('.')[0];
+                    const capName = name.charAt(0).toUpperCase() + name.slice(1);
+                    const dock = document.getElementById('dockContainer');
+                    const addBtn = dock.querySelector('.add-site-btn');
+                    const link = document.createElement('a');
+                    link.href = fUrl; link.className = 'dock-item'; link.target = '_blank';
+                    link.innerHTML = `🌐<span>${capName}</span>`;
+                    dock.insertBefore(link, addBtn);
+                } catch { alert('Некорректная ссылка!'); }
+            }
+        }
+
+        // Офлайн игра
+        let gameInterval = null;
+        function openGame() {
+            document.getElementById('gameOverlay').classList.add('active');
+            initTetris();
+        }
+        function closeGame() {
+            document.getElementById('gameOverlay').classList.remove('active');
+            clearInterval(gameInterval);
+        }
+        function closeGameOnBg(e) { if (e.target.id === 'gameOverlay') closeGame(); }
+
+        const tCanvas = document.getElementById('tetris');
+        const tCtx = tCanvas.getContext('2d');
+        const ROWS = 20, COLS = 10, BLOCK_SIZE = 20;
+        let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        let piece = { x: 3, y: 0 };
+
+        function initTetris() {
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                piece.y++;
+                if (piece.y > ROWS - 2) {
+                    piece.y = 0;
+                    piece.x = Math.floor(Math.random() * (COLS - 2));
+                }
+                drawTetris();
+            }, 400);
+        }
+
+        function drawTetris() {
+            tCtx.clearRect(0, 0, tCanvas.width, tCanvas.height);
+            tCtx.fillStyle = '#f59e0b';
+            tCtx.fillRect(piece.x * BLOCK_SIZE, piece.y * BLOCK_SIZE, BLOCK_SIZE * 2 - 1, BLOCK_SIZE * 2 - 1);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (!document.getElementById('gameOverlay').classList.contains('active')) return;
+            if (e.key === 'ArrowLeft' && piece.x > 0) piece.x--;
+            if (e.key === 'ArrowRight' && piece.x < COLS - 2) piece.x++;
+            if (e.key === 'ArrowDown') piece.y++;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                openSearch();
+            }
+        });
+    </script>
+</body>
+</html>
